@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Unstable TD Trade Hub</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+body {
+  margin: 0;
+  font-family: Inter, sans-serif;
+  background: radial-gradient(#0a0a12, #050508);
+  color: white;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+header {
+  text-align: center;
+  padding: 15px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+/* MAIN FULL SCREEN */
+.container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 10px;
+  height: calc(100vh - 120px);
+}
+
+/* PANEL */
+.panel {
+  background: #12121b;
+  padding: 15px;
+  border-radius: 16px;
+  width: 45%;
+  display: flex;
+  flex-direction: column;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 5px;
+}
+
+/* SLOT */
+.slot {
+  background: #1c1c28;
+  height: 80px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 12px;
+}
+
+.slot:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(124,77,255,0.3);
+}
+
+/* RESULT BAR */
+.result {
+  text-align: center;
+  padding: 10px;
+  font-size: 16px;
+}
+
+/* TOP BAR */
+.topbar {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  flex-wrap: wrap;
+}
+
+input, select, button {
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  font-family: Inter;
+}
+
+/* MODAL */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-box {
+  background: #141420;
+  padding: 15px;
+  width: 90%;
+  max-width: 520px;
+  border-radius: 14px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.item-btn {
+  padding: 10px;
+  margin: 6px 0;
+  background: #1e1e2d;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.item-btn:hover {
+  transform: scale(1.03);
+}
+
+/* POPULAR TAG */
+.popular {
+  float: right;
+  font-size: 10px;
+  color: #00ff88;
+}
+
+/* FOOTER */
+footer {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+  padding: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>💎 Unstable TD Trade Hub</h1>
+</header>
+
+<div class="topbar">
+  <input id="search" placeholder="Search units...">
+  <select id="sort">
+    <option value="high">Highest Value</option>
+    <option value="low">Lowest Value</option>
+    <option value="stable">Stable</option>
+    <option value="unstable">Unstable</option>
+  </select>
+  <button onclick="clearTrade()">Clear</button>
+  <button onclick="saveTrade()">Save</button>
+  <button onclick="loadTrade()">Load</button>
+</div>
+
+<div class="container">
+
+  <div class="panel">
+    <h2>You</h2>
+    <div class="grid" id="you"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Them</h2>
+    <div class="grid" id="them"></div>
+  </div>
+
+</div>
+
+<div class="result" id="result">Loading...</div>
+
+<footer>MADE BY SHAR</footer>
+
+<!-- MODAL -->
+<div class="modal" id="modal">
+  <div class="modal-box">
+    <input id="modalSearch" placeholder="Search...">
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+
+/* ================= DATA ================= */
+const items = [
+  {name:"Lawman", value:10, demand:"Stable", rarity:"Common"},
+  {name:"Boosfer", value:20, demand:"Unstable", rarity:"Legend"},
+  {name:"Wemmbu", value:6500, demand:"Stable", rarity:"Enchanted"},
+  {name:"Director", value:50000, demand:"Rising", rarity:"Elusive"}
+];
+
+/* ================= POPULAR SYSTEM ================= */
+let popularity = JSON.parse(localStorage.getItem("pop") || "{}");
+
+function addPop(name){
+  popularity[name] = (popularity[name] || 0) + 1;
+  localStorage.setItem("pop", JSON.stringify(popularity));
+}
+
+/* ================= SOUND ================= */
+const clickSound = new Audio("https://www.myinstants.com/media/sounds/click.mp3");
+
+/* ================= GRID ================= */
+function makeGrid(id){
+  const el = document.getElementById(id);
+  for(let i=0;i<6;i++){
+    let s=document.createElement("div");
+    s.className="slot";
+    s.onclick=()=>openModal(s);
+    s.innerHTML="+";
+    el.appendChild(s);
+  }
+}
+makeGrid("you");
+makeGrid("them");
+
+let selected;
+
+/* ================= MODAL ================= */
+const modal=document.getElementById("modal");
+const list=document.getElementById("list");
+
+function openModal(slot){
+  selected=slot;
+  modal.style.display="flex";
+  render("");
+}
+
+function render(filter){
+
+  let data=[...items];
+
+  const sort=document.getElementById("sort").value;
+
+  if(sort==="high") data.sort((a,b)=>b.value-a.value);
+  if(sort==="low") data.sort((a,b)=>a.value-b.value);
+
+  list.innerHTML="";
+
+  data.filter(i=>i.name.toLowerCase().includes(filter.toLowerCase()))
+  .forEach(i=>{
+
+    let popTag = popularity[i.name] > 5 ? "🔥 POPULAR" : "";
+
+    let div=document.createElement("div");
+    div.className="item-btn";
+
+    div.innerHTML=`
+      <b>${i.name}</b>
+      <span class="popular">${popTag}</span><br>
+      Value: ${i.value} | ${i.demand}
+    `;
+
+    div.onclick=()=>{
+      clickSound.play();
+      addPop(i.name);
+
+      selected.innerHTML=`${i.name}<br>${i.value}`;
+      selected.value=i.value;
+
+      modal.style.display="none";
+      update();
+    };
+
+    list.appendChild(div);
+  });
+}
+
+document.getElementById("search").oninput=e=>render(e.target.value);
+document.getElementById("modalSearch").oninput=e=>render(e.target.value);
+
+modal.onclick=e=>{if(e.target===modal)modal.style.display="none";};
+
+/* ================= TRADE CALC ================= */
+function sum(id){
+  let total=0;
+  document.querySelectorAll(`#${id} .slot`)
+  .forEach(s=>total+=Number(s.value||0));
+  return total;
+}
+
+function update(){
+  let a=sum("you");
+  let b=sum("them");
+
+  let diff=a-b;
+  let percent=((diff/b)*100)||0;
+
+  let status="FAIR TRADE";
+  if(percent>10) status=`📈 YOU OVERPAY +${percent.toFixed(1)}%`;
+  if(percent<-10) status=`📉 THEY OVERPAY +${Math.abs(percent).toFixed(1)}%`;
+
+  document.getElementById("result").innerText=
+  `${a} vs ${b} | ${status}`;
+}
+
+/* ================= SAVE SYSTEM ================= */
+function saveTrade(){
+  localStorage.setItem("trade", document.getElementById("you").innerHTML);
+  alert("Saved!");
+}
+
+function loadTrade(){
+  document.getElementById("you").innerHTML = localStorage.getItem("trade") || "";
+  update();
+}
+
+function clearTrade(){
+  document.getElementById("you").innerHTML="";
+  document.getElementById("them").innerHTML="";
+  location.reload();
+}
+
+update();
+</script>
+
+</body>
+</html>
